@@ -1,9 +1,8 @@
-
 (define (domain robot-warehouse)
 
   (:requirements :strips :typing)
 
-  ;; TIPOS DE OBJETOS
+  ;; TIPOS
   (:types
     robot
     producto
@@ -19,26 +18,34 @@
     ;; Ubicacion de los productos
     (producto-en ?p - producto ?l - ubicacion)
 
-    ;; Producto que transporta un robot
+    ;; Producto transportado
     (transportando ?r - robot ?p - producto)
 
-    ;; Robot disponible para recoger productos
+    ;; Disponibilidad del robot
     (libre ?r - robot)
 
-    ;; Conexion entre dos ubicaciones
+    ;; Conexiones entre ubicaciones
     (conectado ?l1 - ubicacion ?l2 - ubicacion)
 
-    ;; Ubicaciones especiales
+    ;; Estaciones especiales
     (estacion-empaque ?l - ubicacion)
     (zona-despacho ?l - ubicacion)
+    (estacion-carga ?l - ubicacion)
 
     ;; Estado de los productos
+    (pendiente-empaque ?p - producto)
     (empaquetado ?p - producto)
     (entregado ?p - producto)
+
+    ;; Estados de bateria
+    (bateria-alta ?r - robot)
+    (bateria-media ?r - robot)
+    (bateria-baja ?r - robot)
+    (bateria-agotada ?r - robot)
   )
 
-  ;; ACCION 1: MOVER ROBOT
-  (:action mover-robot
+  ;; ACCION 1: MOVER CON BATERIA ALTA
+  (:action mover-robot-alta
 
     :parameters (
       ?r - robot
@@ -49,15 +56,124 @@
     :precondition (and
       (robot-en ?r ?origen)
       (conectado ?origen ?destino)
+      (bateria-alta ?r)
     )
 
     :effect (and
       (not (robot-en ?r ?origen))
       (robot-en ?r ?destino)
+      (not (bateria-alta ?r))
+      (bateria-media ?r)
     )
   )
 
-  ;; ACCION 2: RECOGER PRODUCTO
+  ;; ACCION 2: MOVER CON BATERIA MEDIA
+  (:action mover-robot-media
+
+    :parameters (
+      ?r - robot
+      ?origen - ubicacion
+      ?destino - ubicacion
+    )
+
+    :precondition (and
+      (robot-en ?r ?origen)
+      (conectado ?origen ?destino)
+      (bateria-media ?r)
+    )
+
+    :effect (and
+      (not (robot-en ?r ?origen))
+      (robot-en ?r ?destino)
+      (not (bateria-media ?r))
+      (bateria-baja ?r)
+    )
+  )
+
+  ;; ACCION 3: MOVER CON BATERIA BAJA
+  (:action mover-robot-baja
+
+    :parameters (
+      ?r - robot
+      ?origen - ubicacion
+      ?destino - ubicacion
+    )
+
+    :precondition (and
+      (robot-en ?r ?origen)
+      (conectado ?origen ?destino)
+      (bateria-baja ?r)
+    )
+
+    :effect (and
+      (not (robot-en ?r ?origen))
+      (robot-en ?r ?destino)
+      (not (bateria-baja ?r))
+      (bateria-agotada ?r)
+    )
+  )
+
+  ;; ACCION 4: RECARGAR DESDE BATERIA MEDIA
+  (:action recargar-media
+
+    :parameters (
+      ?r - robot
+      ?l - ubicacion
+    )
+
+    :precondition (and
+      (robot-en ?r ?l)
+      (estacion-carga ?l)
+      (bateria-media ?r)
+    )
+
+    :effect (and
+      (not (bateria-media ?r))
+      (bateria-alta ?r)
+    )
+  )
+
+  ;; ACCION 5: RECARGAR DESDE BATERIA BAJA
+  (:action recargar-baja
+
+    :parameters (
+      ?r - robot
+      ?l - ubicacion
+    )
+
+    :precondition (and
+      (robot-en ?r ?l)
+      (estacion-carga ?l)
+      (bateria-baja ?r)
+    )
+
+    :effect (and
+      (not (bateria-baja ?r))
+      (bateria-alta ?r)
+    )
+  )
+
+  ;; ACCION 6: RECARGAR DESDE BATERIA AGOTADA
+  (:action recargar-agotada
+
+    :parameters (
+      ?r - robot
+      ?l - ubicacion
+    )
+
+    :precondition (and
+      (robot-en ?r ?l)
+      (estacion-carga ?l)
+      (bateria-agotada ?r)
+    )
+
+    :effect (and
+      (not (bateria-agotada ?r))
+      (bateria-alta ?r)
+    )
+  )
+
+  ;; ACCION 7: RECOGER PRODUCTO
   (:action recoger-producto
 
     :parameters (
@@ -70,6 +186,7 @@
       (robot-en ?r ?l)
       (producto-en ?p ?l)
       (libre ?r)
+      (pendiente-empaque ?p)
     )
 
     :effect (and
@@ -79,7 +196,7 @@
     )
   )
 
-  ;; ACCION 3: DEJAR PRODUCTO
+  ;; ACCION 8: DEJAR PRODUCTO
   (:action dejar-producto
 
     :parameters (
@@ -91,6 +208,7 @@
     :precondition (and
       (robot-en ?r ?l)
       (transportando ?r ?p)
+      (pendiente-empaque ?p)
     )
 
     :effect (and
@@ -100,7 +218,7 @@
     )
   )
 
-  ;; ACCION 4: EMPAQUETAR PRODUCTO
+  ;; ACCION 9: EMPAQUETAR PRODUCTO
   (:action empaquetar-producto
 
     :parameters (
@@ -112,15 +230,17 @@
     :precondition (and
       (robot-en ?r ?l)
       (transportando ?r ?p)
+      (pendiente-empaque ?p)
       (estacion-empaque ?l)
     )
 
     :effect (and
+      (not (pendiente-empaque ?p))
       (empaquetado ?p)
     )
   )
 
-  ;; ACCION 5: ENTREGAR PRODUCTO
+  ;; ACCION 10: ENTREGAR PRODUCTO
   (:action entregar-producto
 
     :parameters (
@@ -143,5 +263,4 @@
       (entregado ?p)
     )
   )
-
 )
